@@ -542,6 +542,9 @@ local function repeate_apply_range(count, fn)
   if range and count ~= 0 then
     visual_select(range)
   end
+
+  -- TODO: could uncomment the below line to return selection position
+  -- return range
 end
 
 --- @param count integer
