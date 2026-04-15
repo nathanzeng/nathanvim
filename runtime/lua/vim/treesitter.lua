@@ -12,6 +12,7 @@ local M = vim._defer_require('vim.treesitter', {
   language = ..., --- @module 'vim.treesitter.language'
   languagetree = ..., --- @module 'vim.treesitter.languagetree'
   query = ..., --- @module 'vim.treesitter.query'
+  _select = ..., --- @module 'vim.treesitter._select'
 })
 
 local LanguageTree = M.languagetree
@@ -499,6 +500,37 @@ end
 ---@return string
 function M.foldexpr(lnum)
   return M._fold.foldexpr(lnum)
+end
+
+--- @class vim.treesitter.select.Opts
+--- @inlinedoc
+---
+--- Direction to select in
+--- @field direction 'parent'|'child'|'next'|'prev'
+---
+--- Number of selections to make in the given direction (default 1)
+--- @field count integer?
+
+--- Perform an incremental selection based on the given direction
+---@param opts vim.treesitter.select.Opts
+function M.select(opts)
+  vim.validate('opts', opts, 'table')
+  vim.validate('count', opts.count, 'number', true)
+
+  local direction = opts.direction
+  local count = opts.count or 1
+
+  if direction == 'parent' then
+    return M._select.select_parent(count)
+  elseif direction == 'child' then
+    return M._select.select_child(count)
+  elseif direction == 'next' then
+    return M._select.select_next(count)
+  elseif direction == 'prev' then
+    return M._select.select_prev(count)
+  else
+    error("Invalid value for option 'direction'")
+  end
 end
 
 return M
