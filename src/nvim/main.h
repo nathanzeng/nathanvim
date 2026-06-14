@@ -8,7 +8,6 @@
 #define MAX_ARG_CMDS 10
 
 extern Loop main_loop;
-extern const char startreason_restart_arg[];
 
 // Struct for various parameters passed between main() and other functions.
 typedef struct {

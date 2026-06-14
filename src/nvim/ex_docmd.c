@@ -4995,7 +4995,7 @@ static void ex_restart(exarg_T *eap)
   const list_T *l = get_vim_var_list(VV_ARGV);
   int argc = tv_list_len(l);
 
-  char **argv = xcalloc((size_t)argc + 4, sizeof(char *));
+  char **argv = xcalloc((size_t)argc + 3, sizeof(char *));
   size_t i = 0;
   const char *listen_arg = NULL;  // --listen arg given by user, if any.
 
@@ -5034,7 +5034,6 @@ static void ex_restart(exarg_T *eap)
       argv[i++] = xstrdup(arg);
       if (i == 1) {
         argv[i++] = xstrdup("--embed");
-        argv[i++] = xstrdup(startreason_restart_arg);
         // Without --headless, embed waits for UI to attach.
         // Only add --headless when there is no UI.
         if (no_ui) {
@@ -5103,6 +5102,16 @@ static void ex_restart(exarg_T *eap)
   MAXSIZE_TEMP_ARRAY(detach_args, 1);
   ADD_C(detach_args, BOOLEAN_OBJ(true));
   rpc_send_call(channel->id, "nvim__chan_set_detach", detach_args, &result_mem, &err);
+  if (ERROR_SET(&err)) {
+    goto fail_2;
+  }
+  arena_mem_free(result_mem);
+  result_mem = NULL;
+
+  // Set v:startreason on new server
+  MAXSIZE_TEMP_ARRAY(startreason_args, 1);
+  ADD_C(startreason_args, CSTR_AS_OBJ("restart"));
+  rpc_send_call(channel->id, "nvim__set_startreason", startreason_args, &result_mem, &err);
   if (ERROR_SET(&err)) {
     goto fail_2;
   }
