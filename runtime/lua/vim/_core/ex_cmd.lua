@@ -402,7 +402,8 @@ end
 
 -- Restart that preserves session and window layout
 -- TODO: https://github.com/neovim/neovim/issues/34204
-function M.ex_session_restart()
+--- @param eap vim._core.ExCmdArgs
+function M.ex_session_restart(eap)
   -- Create or reuse a directory in the temp directory where we will write the session
   -- It is one level up from the per-instance directory to prevent being cleared prematurely
   local temp_root = fs.normalize(api.nvim_get_temp_dir() .. '..')
@@ -432,22 +433,43 @@ function M.ex_session_restart()
 
   -- Session to write
   local session = fs.abspath(filename)
-  vim.cmd('%argdelete')
+  local success, msg = pcall(vim.cmd, '%argdelete')
+  if not success then
+    pcall(vim.fs.rm, session)
+    error(msg)
+  end
 
   -- Write session
   local session_arg = vim.fn.fnameescape(session)
-  vim.cmd('mksession! ' .. session_arg)
+  success, msg = pcall(vim.cmd, 'mksession! ' .. session_arg)
+  if not success then
+    pcall(vim.fs.rm, session)
+    error(msg)
+  end
 
   -- Restart Neovim and execute Lua commands to restore necessary session
-  local after = { 'vim.cmd("source ' .. session_arg:gsub('\\', '\\\\') .. '")' }
-  table.insert(after, ('pcall(vim.fs.rm, %s)'):format(vim.inspect(session)))
+  local user_command = ''
+  if eap.args ~= '' then
+    user_command = (' vim.cmd(%s);'):format(vim.inspect(eap.args))
+  end
 
-  local success, msg = pcall(function()
-    -- "+:::" special argument tells the C handler that this is actually a non-bang restart
-    -- That way, v:startreason can be set correctly
-    vim.cmd('restart! +:::qall lua ' .. table.concat(after, ';'))
-  end)
+  local function escape_cmdarg(cmd)
+    return cmd:gsub('\\', '\\\\'):gsub('%s', function(c)
+      return '\\' .. c
+    end)
+  end
+
+  local after = (
+    'local session = %s; local ok, err = pcall(function() vim.cmd(%s);%s end);'
+    .. ' pcall(vim.fs.rm, session); if not ok then error(err) end'
+  ):format(vim.inspect(session), vim.inspect('source ' .. session_arg), user_command)
+  local quit_cmd = eap.cmdarg or 'qall'
+  -- ":::..." tells the C handler that this internal :restart! came from a non-bang :restart.
+  local restart_cmd = ('restart! +:::%s lua %s'):format(escape_cmdarg(quit_cmd), after)
+
+  success, msg = pcall(vim.cmd, restart_cmd)
   if not success then
+    pcall(vim.fs.rm, session)
     error(msg)
   end
 end
